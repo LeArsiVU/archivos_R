@@ -1,0 +1,79 @@
+---
+title: "Ejemplo"
+author: "**Isra**"
+date: "2019-2020"
+
+header-includes:
+   - \usepackage{xcolor}%Para agregar un paquete en latex
+   - \usepackage{booktabs}
+   - \usepackage{longtable}
+   - \usepackage{array}
+   - \usepackage{multirow}
+   - \usepackage{wrapfig}
+   - \usepackage{float}
+   - \usepackage{colortbl}
+   - \usepackage{pdflscape}
+   - \usepackage{tabu}
+   - \usepackage{threeparttable}
+   - \usepackage{threeparttablex}
+   - \usepackage[normalem]{ulem}
+   - \usepackage{makecell}
+   - \DeclareUnicodeCharacter{2206}{\ensuremath{\Delta}} % se escribe la letra delta
+output: 
+   pdf_document
+---
+
+```{r echo=FALSE, results='hide',collapse=TRUE, message=FALSE,warning=FALSE}
+
+
+library(shiny)
+library(DT)
+library(dplyr)
+
+
+library(DBI)
+library(RMySQL)
+library(dplyr)
+library(dbplyr)
+library(knitr)#para mostrar las tablas
+
+options(kableExtra.auto_format = FALSE)
+library(kableExtra)
+
+
+baseD <- dbConnect(drv =MySQL(), 
+                dbname = "DASHBOARD", 
+                host = "127.0.0.1", username = "root", 
+                password = "I$raMySQL0506",
+                port = 3306, 
+                unix.sock = "/var/run/mysqld/mysqld.sock") #conectarse a la tabla
+
+tabla <- dbGetQuery(baseD, "SELECT * FROM DASHBOARD_TOTAL;")#obtener la tabla
+dbDisconnect(baseD)#Desconecta la base de datos 
+```
+
+```{r echo=FALSE, results='asis',collapse=TRUE, message=FALSE,warning=FALSE}
+
+#colnames(tabla)<-c("Medio","Venta","Alcance","∆ vs MSAA","Venta","Alcance","∆ vs MMAA","Venta","Alcance","∆ vs AA")
+
+colnames(tabla)<-c("Medio","B","C","D","E","FF","G","H","I","J")
+uuu=sprintf("%s",'$')
+tabla%>%
+  mutate(
+          B = cell_spec(paste(uuu,B, sep = ""),"latex"),
+          E = cell_spec(paste(uuu,E, sep = ""),"latex"),
+          H = cell_spec(paste(uuu,H, sep = ""),"latex"),
+          C =cell_spec(paste(C,'%', sep = ""), bold = T,"latex", color =ifelse(C<100,"red","#1b7225")),
+          D =cell_spec(paste(D,'%', sep = ""),bold = T, "latex", color =ifelse(D<100,"red","#1b7225")),
+          G =cell_spec(paste(G,'%', sep = ""), bold = T,"latex", color =ifelse(G<100,"red","#1b7225")),
+          FF =cell_spec(paste(FF,'%', sep = ""), bold = T,"latex", color =ifelse(FF<100,"red","#1b7225")),
+          I =cell_spec(paste(I,'%', sep = ""), bold = T,"latex", color =ifelse(I<100,"red","#1b7225")),
+          J =cell_spec(paste(J,'%', sep = ""), bold = T,"latex", color =ifelse(J<100,"red","#1b7225")))%>%
+  select(everything())%>%
+  kable("latex", escape = F, booktabs = T, linesep = "", align = "c", col.names =c("Medio","Venta","Alcance","∆ vs MSAA","Venta","Alcance","∆ vs MMAA","Venta","Alcance","∆ vs AA"))%>%
+  kable_styling(latex_options = c("striped", "scale_down","hold_position"))%>%
+  add_header_above(c(" ", "Resultado Semanal" = 3, "Resultado Mensual" = 3,"Resultado Anual" = 3))%>%
+  row_spec(3, background  = "#c0c0c0")
+
+```
+

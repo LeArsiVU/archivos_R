@@ -1,0 +1,84 @@
+---
+title: "Tablas"
+author: "**Isra**"
+date: "2020-03-01"
+
+header-includes:
+   - \usepackage{xcolor}%Para agregar un paquete en latex
+   - \usepackage{booktabs}
+   - \usepackage{longtable}
+   - \usepackage{array}
+   - \usepackage{multirow}
+   - \usepackage{wrapfig}
+   - \usepackage{float}
+   - \usepackage{colortbl}
+   - \usepackage{pdflscape}
+   - \usepackage{tabu}
+   - \usepackage{threeparttable}
+   - \usepackage{threeparttablex}
+   - \usepackage[normalem]{ulem}
+   - \usepackage{makecell}
+   
+output: pdf_document
+---
+
+```{r,echo=FALSE,results='asis',collapse=TRUE}
+library(DBI)
+library(RMySQL)
+library(dplyr)
+library(dbplyr)
+library(knitr)#para mostrar las tablas
+
+options(kableExtra.auto_format = FALSE)
+library(kableExtra)
+
+library(dplyr)
+
+baseD <- dbConnect(drv =MySQL(), 
+                dbname = "clubibarra", 
+                host = "127.0.0.1", username = "root", 
+                password = "I$raMySQL0506",
+                port = 3306, 
+                unix.sock = "/var/run/mysqld/mysqld.sock") #conectarse a la tabla
+
+tabla <- dbGetQuery(baseD, "SELECT * FROM locos;")#obtener la tabla
+dbDisconnect(baseD)#Desconecta la base de datos 
+
+kable(tabla,caption="Tabla desde base de datos", align = "lc")
+#tabla[,1] #la primer columna
+#tabla[,2] #la degunda columna
+
+N<-paste("\\textcolor{red}{\\textit{",tabla[,1],"}}")#concatenar strings
+E<-paste("\\textcolor{blue}{\\textbf{",as.character(tabla[,2]),"}}")#concatenar strings
+M<-data.frame(Nombre=N,Edad=E)
+
+kable(M,caption="Dándole formato a la tabla", align = "lc")
+
+kable(tabla,"latex", caption="Dándole formato a la tabla", align = "lc")%>%
+  kable_styling(font_size = 20)
+
+kable(tabla,"latex", caption="Dándole formato a la tabla", align = "lc")%>%
+  kable_styling(full_width = T)%>%
+  column_spec(1, width = "8cm")
+
+kable(tabla,"latex", booktabs = T,caption="Dándole formato a la tabla", align = "lc")%>%
+  kable_styling(latex_options = c("striped", "scale_down","hold_position")) 
+
+kable(tabla,"latex", caption="Dándole formato a la tabla")%>%
+  kable_styling("striped", full_width = F)%>%
+  column_spec(1, border_left = T,border_right = F, bold = T)%>%
+  column_spec(2, border_left = F,border_right = T, bold = T)%>%
+  row_spec(2, italic = T)%>%
+  row_spec(3, bold = T, color = "white", background = "blue")
+
+kable(tabla,"latex", booktabs = T, align = "c", caption="Dándole formato a la tabla")%>%
+  kable_styling(latex_options = "striped", full_width = F)%>%
+  column_spec(1, border_left = T,border_right = F, bold = T)%>%
+  column_spec(2, border_left = F,border_right = T, bold = T)%>%
+  row_spec(0, angle = 45)
+
+tabla%>%
+  mutate( nombre =cell_spec(nombre, "latex",bold = ifelse(nombre=='Isra',T,ifelse(nombre=='Chema',T,F)), italic=ifelse(nombre!='isra',T,F), color =ifelse(nombre=='Isra',"black","orange")), edad =cell_spec(edad, "latex",font_size=19,bold = T, color = "white", align = "c", angle = 90,background =ifelse(edad<25, "red", ifelse(edad>25, "blue", "orange"))))%>%
+  select(nombre,edad)%>%
+  kable("latex", escape = F, booktabs = T, linesep = "")
+```

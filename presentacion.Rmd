@@ -1,0 +1,84 @@
+---
+title: "*R Markdown*    "
+author: "__Isra__"
+date: "27/1/2020"
+output: beamer_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## se ponen los dos gatos para iniciar una diapositiva
+```{r,echo=TRUE}
+x<-100 #asigna el valor de 100 a la variable x, como entero
+y<-sqrt(x)
+y
+y**3 #elevar al cubo
+
+h<-6+8i #numero complejo
+h
+
+u<-c(1,6,3); #vector
+u
+```
+## con echo igual a false
+```{r,echo=FALSE}
+x<-100 #asigna el valor de 100 a la variable x, como entero
+y<-sqrt(x)
+y
+y**3 #elevar al cubo
+
+h<-6+8i #numero complejo
+h
+
+u<-c(1,6,3); #vector
+u
+```
+
+## **SQL** Acceder a la base de datos con la librería __RMySQL__
+```{r,echo=FALSE}
+library(DBI)
+library(RMySQL)
+library(dplyr)
+library(dbplyr)
+
+baseD <- dbConnect(drv =MySQL(), 
+                dbname = "clubibarra", 
+                host = "127.0.0.1", username = "root", 
+                password = "I$raMySQL0506",
+                port = 3306, 
+                unix.sock = "/var/run/mysqld/mysqld.sock") #conectarse a la tabla
+
+tabla <- dbGetQuery(baseD, "SELECT * FROM locos;")#obtener la tabla
+#View(tabla)#ver la tabla
+tabla
+I=c(1,2,3)
+L=c("C","C++","FORTRAN")
+Lenguajes=data.frame(id=I,languaje=L)#guarda la informacion de vectores del mismo tamaño
+t
+
+#dbWriteTable(baseD,"Lenguajes", t,rownames=FALSE)#crea una tabla y le agrega lo que está en el data frame
+copy_to(baseD,Lenguajes,temporary = FALSE)#
+
+dbListTables(baseD)#ver la tabla en consola
+dbDisconnect(baseD)#Desconecta la base de datos
+```
+
+## **SQL** Acceder a la base de datos con la librería que se creo y mostrar su contenido
+```{r,echo=FALSE,results='asis'}
+library(DBI)
+library(RMySQL)
+library(knitr)#para mostrar las tablas
+
+baseD <- dbConnect(drv =MySQL(), 
+                dbname = "clubibarra", 
+                host = "127.0.0.1", username = "root", 
+                password = "I$raMySQL0506",
+                port = 3306, 
+                unix.sock = "/var/run/mysqld/mysqld.sock") #conectarse a la tabla
+
+tabla <- dbGetQuery(baseD, "SELECT * FROM Lenguajes;")#obtener la tabla
+
+kable(tabla,caption="Prueba SQL + R Markdown", align = "lc")
+```
