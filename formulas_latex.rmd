@@ -1,0 +1,76 @@
+---
+title: "Tablas"
+author: "**Arsi**"
+date: "2020-03-01"
+
+header-includes:
+   - \usepackage{xcolor}%Para agregar un paquete en latex
+output: pdf_document
+---
+
+# Página 1
+- **Negritas**
+
+- _Italica_
+
+- H~2~O
+
+- X^3^
+
+- ```jejeje```
+
+## página 2
+
+[Circles](https://www.youtube.com/watch?v=SPW22-RUM1k)^[Canción de Postmalone]
+
+
+![Hackeando](hacker.png)
+
+
+### Página 3
+>
+"jajaja."
+>
+>--- Arsi VU
+
+$$A=\begin{array}{cc}
+A_{11}&A_{12}\\
+A_{21}&A_{22}\\
+\end{array}$$
+
+$$B=\begin{bmatrix}
+A_{11}&A_{12}\\
+A_{21}&A_{22}\\
+\end{bmatrix}$$
+
+$$\Theta=\begin{pmatrix}
+A_{11}&A_{12}\\
+A_{21}&A_{22}\\
+\end{pmatrix}$$
+
+# Página 4
+```{r,echo=FALSE,results='asis',collapse=TRUE}
+library(DBI)
+library(RMySQL)
+library(dplyr)
+library(dbplyr)
+library(knitr)#para mostrar las tablas
+
+baseD <- dbConnect(drv =MySQL(), 
+                dbname = "clubibarra", 
+                host = "127.0.0.1", username = "root", 
+                password = "I$raMySQL0506",
+                port = 3306, 
+                unix.sock = "/var/run/mysqld/mysqld.sock") #conectarse a la tabla
+
+tabla <- dbGetQuery(baseD, "SELECT * FROM locos;")#obtener la tabla
+kable(tabla,caption="Prueba SQL + R Markdown", align = "lc")
+#tabla[,1] #la primer columna
+#tabla[,2] #la degunda columna
+
+hito <- dbGetQuery(baseD, "SELECT * FROM locos where nombre='chema';")#obtener la tabla
+S<-paste("\\textcolor{red}{",tabla[,1],"}"," tiene ","\\textcolor{blue}{",as.character(tabla[,2]),"} años")#concatenar strings
+M<-data.frame(info=S)
+kable(M,caption="Prueba SQL + R Markdown 2", align = "l")
+dbDisconnect(baseD)#Desconecta la base de datos
+```

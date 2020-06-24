@@ -1,0 +1,298 @@
+---
+title: "Automatización de Indicadores de la tasa de Facturación y Tasa de Fraude"
+author: "**Isra**"
+date: "Mayo 2020"
+df_print: paged
+geometry: margin=1.2cm
+classoption: landscape
+header-includes:
+   - \usepackage{xcolor}%Para agregar un paquete en latex
+   - \usepackage{booktabs}
+   - \usepackage{longtable}
+   - \usepackage{array}
+   - \usepackage{multirow}
+   - \usepackage{wrapfig}
+   - \usepackage{float}
+   - \usepackage{colortbl}
+   - \usepackage{pdflscape}
+   - \usepackage{tabu}
+   - \usepackage{threeparttable}
+   - \usepackage{threeparttablex}
+   - \usepackage[normalem]{ulem}
+   - \usepackage{makecell}
+   - \DeclareUnicodeCharacter{2206}{\ensuremath{\Delta}} % se escribe la letra delta
+output: 
+   pdf_document
+---
+
+```{r echo=FALSE, results='hide',collapse=TRUE, message=FALSE,warning=FALSE}
+library(shiny)
+library(DT)
+library(dplyr)
+
+
+library(DBI)
+library(RMySQL)
+library(dplyr)
+library(dbplyr)
+library(knitr)#para mostrar las tablas
+
+library(lubridate)
+library(readxl)
+
+options(kableExtra.auto_format = FALSE)
+library(kableExtra)
+
+fec_fechafinal=as.Date("2020.02.29","%Y.%m.%d") #Fecha corte - cierre de mes
+fec_fechainicial<- fec_fechafinal-(day(fec_fechafinal)-1)
+
+fec_fechafacturafinal<-fec_fechafinal+10
+
+fec_primerdiadelyear<-as.Date(paste0(year(fec_fechafinal),".01.01"),"%Y.%m.%d")
+
+
+
+baseD <- dbConnect(drv =MySQL(), 
+                dbname = "domo", 
+                host = "127.0.0.1", username = "root", 
+                password = "I$raMySQL0506",
+                port = 3306, 
+                unix.sock = "/var/run/mysqld/mysqld.sock") #conectarse a la tabla
+
+tasa_facturacion<-paste("select 
+CASE 
+WHEN des_BuildingBlock ='APP COPPEL' THEN des_BuildingBlock
+WHEN des_BuildingBlock ='COPPEL.COM EN TIENDA' THEN des_BuildingBlock
+ELSE 'COPPEL.COM' END as des_canal,");
+
+tasa_facturacion<-paste(tasa_facturacion,"COUNT(
+CASE
+WHEN DATE(fec_fechaorden) BETWEEN '",fec_fechainicial,"'  AND '",fec_fechafinal,"' AND
+DATE(fec_FechaFacturacion) BETWEEN '",fec_fechainicial,"' AND  '",fec_fechafacturafinal,"' 
+THEN  sec_ordencommerce
+END)/ COUNT(
+CASE
+WHEN DATE(fec_fechaorden) BETWEEN '",fec_fechainicial,"' AND '",fec_fechafinal,"' AND
+(DATE(fec_FechaFacturacion) IS NULL OR DATE(fec_FechaFacturacion) BETWEEN '", fec_fechainicial,"' AND '",fec_fechafacturafinal,"')THEN  sec_ordencommerce
+END)
+as Tasa_Facturacion_mes,")
+
+tasa_facturacion<-paste(tasa_facturacion," COUNT(
+CASE
+WHEN DATE(DATE_ADD(fec_fechaorden, INTERVAL 1 YEAR)) BETWEEN '",fec_fechainicial,"'  AND '",fec_fechafinal,"' 
+AND DATE(DATE_ADD(fec_FechaFacturacion,INTERVAL 1 YEAR)) BETWEEN '",fec_fechainicial,"' AND  '",fec_fechafacturafinal,"' 
+THEN  sec_ordencommerce
+END)/ COUNT(
+CASE
+WHEN DATE(DATE_ADD(fec_fechaorden,INTERVAL 1 YEAR)) BETWEEN '",fec_fechainicial,"' AND '",fec_fechafinal,"' AND
+(DATE(DATE_ADD(fec_FechaFacturacion, INTERVAL 1 YEAR)) IS NULL OR DATE(DATE_ADD(fec_FechaFacturacion,INTERVAL 1 YEAR)) BETWEEN '",fec_fechainicial,"' AND '",fec_fechafacturafinal,"') THEN  sec_ordencommerce
+END)
+as Tasa_Facturacion_LY_mes,")
+
+tasa_facturacion<-paste(tasa_facturacion,"
+COUNT(
+CASE
+WHEN DATE(fec_fechaorden) BETWEEN '",fec_primerdiadelyear,"'  AND '",fec_fechafinal,"' AND
+DATE(fec_FechaFacturacion) BETWEEN '",fec_primerdiadelyear,"' AND  '",fec_fechafacturafinal,"' THEN  sec_ordencommerce
+END)/ COUNT(
+CASE
+WHEN DATE(fec_fechaorden) BETWEEN '",fec_primerdiadelyear,"' AND '",fec_fechafinal,"' AND
+(DATE(fec_FechaFacturacion) IS NULL OR DATE(fec_FechaFacturacion) BETWEEN '",fec_primerdiadelyear,"' AND '",fec_fechafacturafinal,"')THEN  sec_ordencommerce
+END)
+as Tasa_Facturacion_ytd,")
+
+tasa_facturacion<-paste(tasa_facturacion,"
+COUNT(
+CASE
+WHEN DATE(DATE_ADD(fec_fechaorden, INTERVAL 1 YEAR)) BETWEEN '",fec_primerdiadelyear,"'  AND '",fec_fechafinal,"' AND
+DATE(DATE_ADD(fec_FechaFacturacion,INTERVAL 1 YEAR)) BETWEEN '",fec_primerdiadelyear,"' AND  '",fec_fechafacturafinal,"' THEN  sec_ordencommerce
+END)/ COUNT(
+CASE
+WHEN DATE(DATE_ADD(fec_fechaorden,INTERVAL 1 YEAR)) BETWEEN '",fec_primerdiadelyear,"' AND '",fec_fechafinal,"' AND
+(DATE(DATE_ADD(fec_FechaFacturacion, INTERVAL 1 YEAR)) IS NULL OR DATE(DATE_ADD(fec_FechaFacturacion,INTERVAL 1 YEAR)) BETWEEN '",fec_primerdiadelyear,"' AND '",fec_fechafacturafinal,"')THEN  sec_ordencommerce
+END)
+as Tasa_Facturacion_LY_ytd")
+
+tasa_facturacion<-paste(tasa_facturacion," from mae_ordenes group by des_canal ");
+
+tasa_facturacion<-paste(tasa_facturacion," UNION ALL 
+SELECT 'TOTAL', ");
+
+tasa_facturacion<-paste(tasa_facturacion,"COUNT(
+CASE
+WHEN DATE(fec_fechaorden) BETWEEN '",fec_fechainicial,"'  AND '",fec_fechafinal,"' AND
+DATE(fec_FechaFacturacion) BETWEEN '",fec_fechainicial,"' AND  '",fec_fechafacturafinal,"' 
+THEN  sec_ordencommerce
+END)/ COUNT(
+CASE
+WHEN DATE(fec_fechaorden) BETWEEN '",fec_fechainicial,"' AND '",fec_fechafinal,"' AND
+(DATE(fec_FechaFacturacion) IS NULL OR DATE(fec_FechaFacturacion) BETWEEN '", fec_fechainicial,"' AND '",fec_fechafacturafinal,"')THEN  sec_ordencommerce
+END)
+as Tasa_Facturacion_mes,")
+
+tasa_facturacion<-paste(tasa_facturacion," COUNT(
+CASE
+WHEN DATE(DATE_ADD(fec_fechaorden, INTERVAL 1 YEAR)) BETWEEN '",fec_fechainicial,"'  AND '",fec_fechafinal,"' 
+AND DATE(DATE_ADD(fec_FechaFacturacion,INTERVAL 1 YEAR)) BETWEEN '",fec_fechainicial,"' AND  '",fec_fechafacturafinal,"' 
+THEN  sec_ordencommerce
+END)/ COUNT(
+CASE
+WHEN DATE(DATE_ADD(fec_fechaorden,INTERVAL 1 YEAR)) BETWEEN '",fec_fechainicial,"' AND '",fec_fechafinal,"' AND
+(DATE(DATE_ADD(fec_FechaFacturacion, INTERVAL 1 YEAR)) IS NULL OR DATE(DATE_ADD(fec_FechaFacturacion,INTERVAL 1 YEAR)) BETWEEN '",fec_fechainicial,"' AND '",fec_fechafacturafinal,"') THEN  sec_ordencommerce
+END)
+as Tasa_Facturacion_LY_mes,")
+
+tasa_facturacion<-paste(tasa_facturacion,"
+COUNT(
+CASE
+WHEN DATE(fec_fechaorden) BETWEEN '",fec_primerdiadelyear,"'  AND '",fec_fechafinal,"' AND
+DATE(fec_FechaFacturacion) BETWEEN '",fec_primerdiadelyear,"' AND  '",fec_fechafacturafinal,"' THEN  sec_ordencommerce
+END)/ COUNT(
+CASE
+WHEN DATE(fec_fechaorden) BETWEEN '",fec_primerdiadelyear,"' AND '",fec_fechafinal,"' AND
+(DATE(fec_FechaFacturacion) IS NULL OR DATE(fec_FechaFacturacion) BETWEEN '",fec_primerdiadelyear,"' AND '",fec_fechafacturafinal,"')THEN  sec_ordencommerce
+END)
+as Tasa_Facturacion_ytd,")
+
+tasa_facturacion<-paste(tasa_facturacion,"
+COUNT(
+CASE
+WHEN DATE(DATE_ADD(fec_fechaorden, INTERVAL 1 YEAR)) BETWEEN '",fec_primerdiadelyear,"'  AND '",fec_fechafinal,"' AND
+DATE(DATE_ADD(fec_FechaFacturacion,INTERVAL 1 YEAR)) BETWEEN '",fec_primerdiadelyear,"' AND  '",fec_fechafacturafinal,"' THEN  sec_ordencommerce
+END)/ COUNT(
+CASE
+WHEN DATE(DATE_ADD(fec_fechaorden,INTERVAL 1 YEAR)) BETWEEN '",fec_primerdiadelyear,"' AND '",fec_fechafinal,"' AND
+(DATE(DATE_ADD(fec_FechaFacturacion, INTERVAL 1 YEAR)) IS NULL OR DATE(DATE_ADD(fec_FechaFacturacion,INTERVAL 1 YEAR)) BETWEEN '",fec_primerdiadelyear,"' AND '",fec_fechafacturafinal,"')THEN  sec_ordencommerce
+END)
+as Tasa_Facturacion_LY_ytd")
+
+tasa_facturacion<-paste(tasa_facturacion," from mae_ordenes;");
+
+
+#TASA FRAUDE
+Facturacion<-dbGetQuery(baseD, tasa_facturacion)
+
+tasa_fraude<-paste("select 
+CASE 
+WHEN des_BuildingBlock ='APP COPPEL' THEN des_BuildingBlock
+WHEN des_BuildingBlock ='COPPEL.COM EN TIENDA' THEN des_BuildingBlock
+ELSE 'COPPEL.COM' END as des_canal,");
+
+tasa_fraude<-paste(tasa_fraude,"SUM(
+CASE
+WHEN DATE(fec_fechaorden) BETWEEN '",fec_fechainicial,"' AND '",fec_fechafinal,"' AND des_estatusorden='Contracargo' THEN  imp_preciounitario*num_cantidad
+ELSE 0
+END)/ SUM(
+CASE
+WHEN DATE(fec_FechaFacturacion) BETWEEN '",fec_fechainicial,"' AND '",fec_fechafacturafinal,"' THEN  imp_preciounitario*num_cantidad
+ELSE 0
+END)
+as Tasa_Fraude_mes,")
+
+tasa_fraude<-paste(tasa_fraude," SUM(
+CASE
+WHEN DATE(DATE_ADD(fec_fechaorden, INTERVAL 1 YEAR)) BETWEEN '",fec_fechainicial,"'  AND '",fec_fechafinal,"' AND des_estatusorden='Contracargo' THEN imp_preciounitario*num_cantidad
+ELSE 0
+END)/ SUM(
+CASE
+WHEN DATE(DATE_ADD(fec_FechaFacturacion,INTERVAL 1 YEAR)) BETWEEN '",fec_fechainicial,"' AND '",fec_fechafacturafinal,"' THEN imp_preciounitario*num_cantidad
+ELSE 0
+END)
+as Tasa_Fraude_LY_mes,")
+
+tasa_fraude<-paste(tasa_fraude,"
+SUM(
+CASE
+WHEN DATE(fec_fechaorden) BETWEEN '",fec_primerdiadelyear,"'  AND '",fec_fechafinal,"' AND des_estatusorden='Contracargo' THEN imp_preciounitario*num_cantidad
+ELSE 0
+END)/ SUM(
+CASE
+WHEN  DATE(fec_FechaFacturacion) BETWEEN '",fec_primerdiadelyear,"' AND '",fec_fechafacturafinal,"' THEN imp_preciounitario*num_cantidad
+ELSE 0
+END)
+as Tasa_Fraude_ytd,")
+
+tasa_fraude<-paste(tasa_fraude,"
+SUM(
+CASE
+WHEN DATE(DATE_ADD(fec_fechaorden, INTERVAL 1 YEAR)) BETWEEN '",fec_primerdiadelyear,"'  AND '",fec_fechafinal,"' AND des_estatusorden='Contracargo' THEN imp_preciounitario*num_cantidad
+ELSE 0
+END)/ SUM(
+CASE
+WHEN DATE(DATE_ADD(fec_FechaFacturacion,INTERVAL 1 YEAR)) BETWEEN '",fec_primerdiadelyear,"' AND '",fec_fechafacturafinal,"' THEN imp_preciounitario*num_cantidad
+ELSE 0
+END)
+as Tasa_Fraude_LY_ytd")
+
+tasa_fraude<-paste(tasa_fraude," from mae_ordenes group by des_canal ");
+
+tasa_fraude<-paste(tasa_fraude," UNION ALL 
+SELECT 'TOTAL', ");
+
+tasa_fraude<-paste(tasa_fraude,"SUM(
+CASE
+WHEN DATE(fec_fechaorden) BETWEEN '",fec_fechainicial,"' AND '",fec_fechafinal,"' AND des_estatusorden='Contracargo' THEN  imp_preciounitario*num_cantidad
+ELSE 0
+END)/ SUM(
+CASE
+WHEN DATE(fec_FechaFacturacion) BETWEEN '",fec_fechainicial,"' AND '",fec_fechafacturafinal,"' THEN  imp_preciounitario*num_cantidad
+ELSE 0
+END)
+as Tasa_Fraude_mes,")
+
+tasa_fraude<-paste(tasa_fraude," SUM(
+CASE
+WHEN DATE(DATE_ADD(fec_fechaorden, INTERVAL 1 YEAR)) BETWEEN '",fec_fechainicial,"'  AND '",fec_fechafinal,"' AND des_estatusorden='Contracargo' THEN imp_preciounitario*num_cantidad
+ELSE 0
+END)/ SUM(
+CASE
+WHEN DATE(DATE_ADD(fec_FechaFacturacion,INTERVAL 1 YEAR)) BETWEEN '",fec_fechainicial,"' AND '",fec_fechafacturafinal,"' THEN imp_preciounitario*num_cantidad
+ELSE 0
+END)
+as Tasa_Fraude_LY_mes,")
+
+tasa_fraude<-paste(tasa_fraude,"
+SUM(
+CASE
+WHEN DATE(fec_fechaorden) BETWEEN '",fec_primerdiadelyear,"'  AND '",fec_fechafinal,"' AND des_estatusorden='Contracargo' THEN imp_preciounitario*num_cantidad
+ELSE 0
+END)/ SUM(
+CASE
+WHEN  DATE(fec_FechaFacturacion) BETWEEN '",fec_primerdiadelyear,"' AND '",fec_fechafacturafinal,"' THEN imp_preciounitario*num_cantidad
+ELSE 0
+END)
+as Tasa_Fraude_ytd,")
+
+tasa_fraude<-paste(tasa_fraude,"
+SUM(
+CASE
+WHEN DATE(DATE_ADD(fec_fechaorden, INTERVAL 1 YEAR)) BETWEEN '",fec_primerdiadelyear,"'  AND '",fec_fechafinal,"' AND des_estatusorden='Contracargo' THEN imp_preciounitario*num_cantidad
+ELSE 0
+END)/ SUM(
+CASE
+WHEN DATE(DATE_ADD(fec_FechaFacturacion,INTERVAL 1 YEAR)) BETWEEN '",fec_primerdiadelyear,"' AND '",fec_fechafacturafinal,"' THEN imp_preciounitario*num_cantidad
+ELSE 0
+END)
+as Tasa_Facturacion_LY_ytd")
+
+tasa_fraude<-paste(tasa_fraude," from mae_ordenes;");
+
+
+
+fraude<-dbGetQuery(baseD, tasa_fraude)
+
+dbDisconnect(baseD)#Desconecta la base de datos 
+
+```
+\newpage
+```{r echo=FALSE, results='asis',collapse=TRUE, message=FALSE,warning=FALSE}
+
+kable(Facturacion,"latex",  booktabs = T, linesep = "", align = "lcccc", caption=paste("Tasa de Facturación del ",fec_fechainicial," al ",fec_fechafinal))%>%
+  kable_styling(c("striped", "scale_down",position = "center"))%>%
+  row_spec(4, background  = "#8cc9ca")
+
+kable(fraude,"latex",  booktabs = T, linesep = "", align = "lcccc", caption=paste("Tasa de Fraude del ",fec_fechainicial," al ",fec_fechafinal))%>%
+  kable_styling(c("striped", "scale_down",position = "center"))%>%
+  row_spec(4, background  = "#8cc9ca")
+```
+
